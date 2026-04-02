@@ -1,0 +1,42 @@
+# Pandora 默认技能示例
+# 这些技能会在首次启动时被复制到插件目录，可直接用于测试。
+
+FireNova:
+  Cooldown: 5
+  Skills:
+    # 以施法者为中心的火焰爆炸
+    - particles{p=FLAME;amount=60;r=3} @self
+    - damage{a=10} @playersinradius{r=5}
+
+ConeFlame:
+  Cooldown: 3
+  Skills:
+    # 前方扇形火焰冲击
+    - particles{p=FLAME;amount=30;r=1} @self
+    - damage{a=6} @cone{r=6;angle=100}
+
+SummonMinions:
+  Cooldown: 12
+  Skills:
+    # 召唤亡灵仆从并向附近玩家发送提示
+    - summon{type=ZOMBIE;amount=3;radius=4} @self
+    - message{m="&aSkeleton King 召唤了亡灵仆从！"} @playersinradius{r=20}
+
+SelfHeal:
+  Cooldown: 8
+  Skills:
+    # 血量低于 50% 时自我治疗并获得再生效果
+    - heal{a=8} @self ?healthbelow{amount=0.5}
+    - potion{type=REGENERATION;d=200;lvl=1} @self
+
+LavaPunish:
+  Cooldown: 2
+  Skills:
+    # 只有当目标站在岩浆上时才造成额外伤害
+    - damage{a=4} @target ?onblock{type=LAVA}
+
+KnockUp:
+  Cooldown: 4
+  Skills:
+    # 击飞附近单位
+    - velocity{y=1.0} @playersinradius{r=4}

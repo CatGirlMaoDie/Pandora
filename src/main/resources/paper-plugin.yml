@@ -1,0 +1,10 @@
+name: Pandora
+version: '${version}'
+main: org.gsn.pandora.Pandora
+api-version: '1.21'
+authors: [猫导CatirD]
+description: 猫咪菜单
+permissions:
+  pandora.admin:
+    description: Pandora 管理员命令权限
+    default: op

@@ -1,0 +1,38 @@
+# Pandora 自定义刷怪点默认示例
+
+UndeadCamp1:
+  Mob: SkeletonKing
+  World: world
+  X: 100
+  Y: 64
+  Z: 200
+  Radius: 10
+  MaxMobs: 3
+  Interval: 20s
+  Conditions:
+    - playersInRadius{r=30;min=1}
+    - time{from=13000;to=23000}
+
+FirePit:
+  Mob: FireZombie
+  World: world
+  X: 110
+  Y: 64
+  Z: 210
+  Radius: 8
+  MaxMobs: 6
+  Interval: 10s
+  Conditions:
+    - playersInRadius{r=25;min=1}
+
+ArcherTower:
+  Mob: SkeletonArcher
+  World: world
+  X: 90
+  Y: 70
+  Z: 190
+  Radius: 6
+  MaxMobs: 4
+  Interval: 15s
+  Conditions:
+    - playersInRadius{r=30;min=1}
