@@ -1,5 +1,29 @@
-# Pandora 自定义刷怪点默认示例
+# Pandora 自定义刷怪点配置
+#
+# 配置说明：
+# Mob: 要刷新的实体 ID（在 mobs.yml 中定义）
+# World: 世界名称（必须在 config.yml 的世界过滤列表中）
+# X, Y, Z: 刷怪点中心坐标
+# Radius: 刷新半径（实体会在此范围内随机生成）
+# MaxMobs: 此刷怪点最多同时存在的实体数量
+# Interval: 刷新间隔（支持格式：10s=10秒, 200=200tick, 5000ms=5000毫秒）
+# SpawnAmount: 每次刷新生成的实体数量（可选，默认为 1）
+# Enabled: 是否启用此刷怪点（可选，默认为 true）
+#
+# Despawn: 实体消失配置（可选）
+#   Distance: 玩家离开多远后实体可能消失（方块）
+#   Delay: 超过距离后多久消失（秒）
+#   RemoveWhenFarAway: 是否允许自然消失（true/false）
+#
+# Conditions: 刷新条件（可选，所有条件都满足才会刷新）
+#   - playersInRadius{r=半径;min=最小玩家数} : 范围内至少有指定数量的玩家
+#   - time{from=开始时间;to=结束时间} : 游戏时间在指定范围内（0-23999）
+#   - js{file=脚本文件;func=函数名} : 自定义 JavaScript 条件
+#
+# 注意：世界过滤在 config.yml 中配置（spawning.worlds）
+#       只有在允许的世界中，刷怪点才会生效
 
+# 示例1：亡灵营地 - 夜晚刷新，有玩家靠近时才刷新
 UndeadCamp1:
   Mob: SkeletonKing
   World: world
@@ -9,10 +33,17 @@ UndeadCamp1:
   Radius: 10
   MaxMobs: 3
   Interval: 20s
+  SpawnAmount: 1
+  Enabled: true
+  Despawn:
+    Distance: 128
+    Delay: 30
+    RemoveWhenFarAway: true
   Conditions:
     - playersInRadius{r=30;min=1}
     - time{from=13000;to=23000}
 
+# 示例2：火焰深坑 - 快速刷新，数量较多
 FirePit:
   Mob: FireZombie
   World: world
@@ -22,9 +53,16 @@ FirePit:
   Radius: 8
   MaxMobs: 6
   Interval: 10s
+  SpawnAmount: 2
+  Enabled: true
+  Despawn:
+    Distance: 96
+    Delay: 20
+    RemoveWhenFarAway: true
   Conditions:
     - playersInRadius{r=25;min=1}
 
+# 示例3：弓箭手塔 - 中等刷新速度
 ArcherTower:
   Mob: SkeletonArcher
   World: world
@@ -34,5 +72,47 @@ ArcherTower:
   Radius: 6
   MaxMobs: 4
   Interval: 15s
+  SpawnAmount: 1
+  Enabled: true
+  Despawn:
+    Distance: 128
+    Delay: 30
+    RemoveWhenFarAway: true
   Conditions:
     - playersInRadius{r=30;min=1}
+
+# 示例4：Boss 刷新点 - 长间隔，单个实体，永不自然消失
+BossSpawner:
+  Mob: DragonBoss
+  World: world
+  X: 0
+  Y: 100
+  Z: 0
+  Radius: 5
+  MaxMobs: 1
+  Interval: 300s
+  SpawnAmount: 1
+  Enabled: false
+  Despawn:
+    RemoveWhenFarAway: false
+  Conditions:
+    - playersInRadius{r=50;min=3}
+
+# 示例5：全天候刷新点 - 无时间限制
+GuardPost:
+  Mob: GuardSoldier
+  World: world
+  X: 50
+  Y: 64
+  Z: 50
+  Radius: 12
+  MaxMobs: 8
+  Interval: 30s
+  SpawnAmount: 2
+  Enabled: true
+  Despawn:
+    Distance: 150
+    Delay: 60
+    RemoveWhenFarAway: true
+  Conditions:
+    - playersInRadius{r=40;min=1}

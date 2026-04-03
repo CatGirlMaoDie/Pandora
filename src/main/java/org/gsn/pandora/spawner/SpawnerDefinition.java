@@ -20,6 +20,9 @@ public class SpawnerDefinition {
     private final double radius;
     private final int maxMobs;
     private final long intervalTicks;
+    private final int spawnAmount;
+    private final boolean enabled;
+    private final DespawnConfig despawnConfig;
 
     public SpawnerDefinition(String id,
                              String mobId,
@@ -29,7 +32,10 @@ public class SpawnerDefinition {
                              double z,
                              double radius,
                              int maxMobs,
-                             long intervalTicks) {
+                             long intervalTicks,
+                             int spawnAmount,
+                             boolean enabled,
+                             DespawnConfig despawnConfig) {
         this.id = id;
         this.mobId = mobId;
         this.worldName = worldName;
@@ -39,6 +45,9 @@ public class SpawnerDefinition {
         this.radius = radius;
         this.maxMobs = maxMobs;
         this.intervalTicks = intervalTicks;
+        this.spawnAmount = spawnAmount;
+        this.enabled = enabled;
+        this.despawnConfig = despawnConfig;
     }
 
     public String getId() {
@@ -65,6 +74,18 @@ public class SpawnerDefinition {
         return intervalTicks;
     }
 
+    public int getSpawnAmount() {
+        return spawnAmount;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public DespawnConfig getDespawnConfig() {
+        return despawnConfig;
+    }
+
     public Location getLocation() {
         World world = Bukkit.getWorld(worldName);
         if (world == null) {
@@ -75,5 +96,32 @@ public class SpawnerDefinition {
 
     public String getKey() {
         return id == null ? null : id.toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * 实体消失配置
+     */
+    public static class DespawnConfig {
+        private final double distance;
+        private final int delaySeconds;
+        private final boolean removeWhenFarAway;
+
+        public DespawnConfig(double distance, int delaySeconds, boolean removeWhenFarAway) {
+            this.distance = distance;
+            this.delaySeconds = delaySeconds;
+            this.removeWhenFarAway = removeWhenFarAway;
+        }
+
+        public double getDistance() {
+            return distance;
+        }
+
+        public int getDelaySeconds() {
+            return delaySeconds;
+        }
+
+        public boolean isRemoveWhenFarAway() {
+            return removeWhenFarAway;
+        }
     }
 }

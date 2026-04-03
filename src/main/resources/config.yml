@@ -5,3 +5,58 @@ debug: true
 javascript:
   enabled: true
   debug: false
+
+# 实体刷新全局配置
+spawning:
+  # 是否启用刷怪系统
+  enabled: true
+
+  # 全局刷新检查频率（tick，20 tick = 1 秒）
+  check-interval: 20
+
+  # 默认刷新间隔（当 spawners.yml 中未指定时使用）
+  default-interval: 10s
+
+  # 默认每次刷新数量
+  default-spawn-amount: 1
+
+  # 默认最大实体数量
+  default-max-mobs: 5
+
+  # 默认刷新半径
+  default-radius: 5.0
+
+  # 实体自然消失配置
+  despawn:
+    # 是否启用自然消失
+    enabled: true
+
+    # 默认消失距离（方块，玩家离开此距离后实体可能消失）
+    distance: 128
+
+    # 默认消失延迟（秒，实体超过距离后多久消失）
+    delay: 30
+
+    # 是否在服务器重启后清理刷怪点生成的实体
+    clear-on-restart: false
+
+  # 刷新条件默认值
+  conditions:
+    # 默认需要的最小玩家数
+    min-players: 1
+
+    # 默认玩家检测半径
+    player-radius: 32.0
+
+  # 世界过滤配置
+  worlds:
+    # 过滤模式：whitelist（白名单）或 blacklist（黑名单）
+    # whitelist: 只在列表中的世界刷新
+    # blacklist: 在除列表外的所有世界刷新
+    mode: whitelist
+
+    # 世界列表
+    list:
+      - world
+      - world_nether
+      - world_the_end

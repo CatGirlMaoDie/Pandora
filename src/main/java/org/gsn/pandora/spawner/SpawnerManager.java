@@ -16,6 +16,7 @@ import org.gsn.pandora.script.ScriptingService;
 
 import java.util.*;
 
+
 /**
  * 负责从 spawners.yml 加载配置，并定时检查刷怪点进行刷怪。
  */
@@ -34,8 +35,13 @@ public class SpawnerManager {
     private final Map<String, SpawnerDefinition> spawners = new HashMap<>();
     private final Map<String, Long> lastSpawnTime = new HashMap<>();
     private final Map<String, List<SpawnerCondition>> conditions = new HashMap<>();
+    private final Map<UUID, Long> entityFarAwayTime = new HashMap<>();
 
     private BukkitTask task;
+    private boolean globalEnabled = true;
+    private long checkInterval = 20L;
+    private String worldFilterMode = "whitelist";
+    private List<String> worldFilterList = new ArrayList<>();
 
     public SpawnerManager(JavaPlugin plugin,
                           PandoraConfigService configService,
@@ -52,6 +58,29 @@ public class SpawnerManager {
         spawners.clear();
         lastSpawnTime.clear();
         conditions.clear();
+        entityFarAwayTime.clear();
+
+        // 读取全局配置
+        FileConfiguration mainConfig = plugin.getConfig();
+        globalEnabled = mainConfig.getBoolean("spawning.enabled", true);
+        checkInterval = mainConfig.getLong("spawning.check-interval", 20L);
+
+        // 读取世界过滤配置
+        worldFilterMode = mainConfig.getString("spawning.worlds.mode", "whitelist").toLowerCase(Locale.ROOT);
+        worldFilterList = mainConfig.getStringList("spawning.worlds.list");
+        if (worldFilterList.isEmpty()) {
+            worldFilterList.add("world");
+        }
+
+        // 默认值
+        String defaultInterval = mainConfig.getString("spawning.default-interval", "10s");
+        int defaultSpawnAmount = mainConfig.getInt("spawning.default-spawn-amount", 1);
+        int defaultMaxMobs = mainConfig.getInt("spawning.default-max-mobs", 5);
+        double defaultRadius = mainConfig.getDouble("spawning.default-radius", 5.0);
+
+        double defaultDespawnDistance = mainConfig.getDouble("spawning.despawn.distance", 128.0);
+        int defaultDespawnDelay = mainConfig.getInt("spawning.despawn.delay", 30);
+        boolean defaultDespawnEnabled = mainConfig.getBoolean("spawning.despawn.enabled", true);
 
         FileConfiguration config = configService.getSpawnersConfig();
         if (config == null) {
@@ -65,14 +94,38 @@ public class SpawnerManager {
                 continue;
             }
 
+            // 检查是否启用
+            boolean enabled = section.getBoolean("Enabled", true);
+            if (!enabled) {
+                plugin.getLogger().info("刷怪点 " + id + " 已禁用，跳过加载。");
+                continue;
+            }
+
             String mobId = section.getString("Mob");
             String worldName = section.getString("World", "world");
             double x = section.getDouble("X");
             double y = section.getDouble("Y");
             double z = section.getDouble("Z");
-            double radius = section.getDouble("Radius", 5.0);
-            int maxMobs = section.getInt("MaxMobs", 5);
-            long intervalTicks = parseInterval(section.getString("Interval", "10s"));
+            double radius = section.getDouble("Radius", defaultRadius);
+            int maxMobs = section.getInt("MaxMobs", defaultMaxMobs);
+            long intervalTicks = parseInterval(section.getString("Interval", defaultInterval));
+            int spawnAmount = section.getInt("SpawnAmount", defaultSpawnAmount);
+
+            // 读取 Despawn 配置
+            SpawnerDefinition.DespawnConfig despawnConfig;
+            if (section.contains("Despawn")) {
+                ConfigurationSection despawnSection = section.getConfigurationSection("Despawn");
+                if (despawnSection != null) {
+                    double distance = despawnSection.getDouble("Distance", defaultDespawnDistance);
+                    int delay = despawnSection.getInt("Delay", defaultDespawnDelay);
+                    boolean removeWhenFarAway = despawnSection.getBoolean("RemoveWhenFarAway", defaultDespawnEnabled);
+                    despawnConfig = new SpawnerDefinition.DespawnConfig(distance, delay, removeWhenFarAway);
+                } else {
+                    despawnConfig = new SpawnerDefinition.DespawnConfig(defaultDespawnDistance, defaultDespawnDelay, defaultDespawnEnabled);
+                }
+            } else {
+                despawnConfig = new SpawnerDefinition.DespawnConfig(defaultDespawnDistance, defaultDespawnDelay, defaultDespawnEnabled);
+            }
 
             SpawnerDefinition def = new SpawnerDefinition(
                 id,
@@ -83,7 +136,10 @@ public class SpawnerManager {
                 z,
                 radius,
                 maxMobs,
-                intervalTicks
+                intervalTicks,
+                spawnAmount,
+                enabled,
+                despawnConfig
             );
             String key = def.getKey();
             if (key != null) {
@@ -103,8 +159,8 @@ public class SpawnerManager {
 
     public void startTask() {
         stopTask();
-        // 每 20 tick（1 秒）检查一次所有刷怪点
-        task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, 20L, 20L);
+        // 使用配置的检查间隔
+        task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, checkInterval, checkInterval);
     }
 
     public void stopTask() {
@@ -255,11 +311,16 @@ public class SpawnerManager {
     }
 
     private void tick() {
-        if (spawners.isEmpty()) {
+        if (!globalEnabled || spawners.isEmpty()) {
             return;
         }
         long now = System.currentTimeMillis();
+
+        // 检查刷怪
         for (SpawnerDefinition def : spawners.values()) {
+            if (!def.isEnabled()) {
+                continue;
+            }
             String key = def.getKey();
             if (key == null) {
                 continue;
@@ -272,11 +333,19 @@ public class SpawnerManager {
             trySpawn(def);
             lastSpawnTime.put(key, now);
         }
+
+        // 检查实体消失
+        checkDespawn();
     }
 
     private void trySpawn(SpawnerDefinition def) {
         Location loc = def.getLocation();
         if (loc == null || loc.getWorld() == null) {
+            return;
+        }
+
+        // 检查世界过滤
+        if (!isWorldAllowed(loc.getWorld().getName())) {
             return;
         }
 
@@ -314,12 +383,22 @@ public class SpawnerManager {
             return;
         }
 
+        // 根据 SpawnAmount 生成多个实体
+        int toSpawn = Math.min(def.getSpawnAmount(), def.getMaxMobs() - count);
         if (mobManager != null) {
-            LivingEntity spawned = mobManager.spawn(def.getMobId(), loc);
-            if (spawned != null) {
-                spawned.getPersistentDataContainer().set(
-                    spawnerTag.getKey(), PersistentDataType.STRING, def.getId()
-                );
+            for (int i = 0; i < toSpawn; i++) {
+                LivingEntity spawned = mobManager.spawn(def.getMobId(), loc);
+                if (spawned != null) {
+                    spawned.getPersistentDataContainer().set(
+                        spawnerTag.getKey(), PersistentDataType.STRING, def.getId()
+                    );
+
+                    // 应用 Despawn 配置
+                    SpawnerDefinition.DespawnConfig despawnConfig = def.getDespawnConfig();
+                    if (despawnConfig != null) {
+                        spawned.setRemoveWhenFarAway(despawnConfig.isRemoveWhenFarAway());
+                    }
+                }
             }
         }
     }
@@ -345,6 +424,17 @@ public class SpawnerManager {
             return null;
         }
         String worldName = location.getWorld().getName();
+
+        // 使用默认值
+        int spawnAmount = plugin.getConfig().getInt("spawning.default-spawn-amount", 1);
+        double despawnDistance = plugin.getConfig().getDouble("spawning.despawn.distance", 128.0);
+        int despawnDelay = plugin.getConfig().getInt("spawning.despawn.delay", 30);
+        boolean despawnEnabled = plugin.getConfig().getBoolean("spawning.despawn.enabled", true);
+
+        SpawnerDefinition.DespawnConfig despawnConfig = new SpawnerDefinition.DespawnConfig(
+            despawnDistance, despawnDelay, despawnEnabled
+        );
+
         SpawnerDefinition def = new SpawnerDefinition(
             id,
             mobId,
@@ -354,7 +444,10 @@ public class SpawnerManager {
             location.getZ(),
             radius,
             maxMobs,
-            intervalTicks
+            intervalTicks,
+            spawnAmount,
+            true,
+            despawnConfig
         );
         String key = def.getKey();
         if (key == null) {
@@ -373,5 +466,91 @@ public class SpawnerManager {
         lastSpawnTime.remove(key);
         conditions.remove(key);
         return removed != null;
+    }
+
+    /**
+     * 检查并处理实体的自然消失
+     */
+    private void checkDespawn() {
+        long now = System.currentTimeMillis();
+
+        for (SpawnerDefinition def : spawners.values()) {
+            if (!def.isEnabled()) {
+                continue;
+            }
+
+            SpawnerDefinition.DespawnConfig despawnConfig = def.getDespawnConfig();
+            if (despawnConfig == null || !despawnConfig.isRemoveWhenFarAway()) {
+                continue;
+            }
+
+            Location loc = def.getLocation();
+            if (loc == null || loc.getWorld() == null) {
+                continue;
+            }
+
+            double r = def.getRadius();
+            double rY = Math.max(3.0, r);
+            double despawnDistance = despawnConfig.getDistance();
+            long despawnDelayMs = despawnConfig.getDelaySeconds() * 1000L;
+
+            for (Entity entity : loc.getWorld().getNearbyEntities(loc, despawnDistance, rY, despawnDistance)) {
+                if (!(entity instanceof LivingEntity)) {
+                    continue;
+                }
+                LivingEntity living = (LivingEntity) entity;
+                String spawnerId = living.getPersistentDataContainer().get(spawnerTag.getKey(), PersistentDataType.STRING);
+                if (spawnerId == null || !spawnerId.equalsIgnoreCase(def.getId())) {
+                    continue;
+                }
+
+                // 检查是否有玩家在附近
+                boolean hasNearbyPlayer = false;
+                for (Player player : loc.getWorld().getPlayers()) {
+                    if (player.getLocation().distance(living.getLocation()) <= despawnDistance) {
+                        hasNearbyPlayer = true;
+                        break;
+                    }
+                }
+
+                UUID entityId = living.getUniqueId();
+                if (hasNearbyPlayer) {
+                    // 有玩家在附近，重置计时
+                    entityFarAwayTime.remove(entityId);
+                } else {
+                    // 没有玩家在附近，开始计时
+                    Long farAwayTime = entityFarAwayTime.get(entityId);
+                    if (farAwayTime == null) {
+                        entityFarAwayTime.put(entityId, now);
+                    } else if (now - farAwayTime >= despawnDelayMs) {
+                        // 超过延迟时间，移除实体
+                        living.remove();
+                        entityFarAwayTime.remove(entityId);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 检查世界是否允许刷新
+     */
+    private boolean isWorldAllowed(String worldName) {
+        if (worldName == null) {
+            return false;
+        }
+
+        boolean inList = worldFilterList.contains(worldName);
+
+        if ("whitelist".equals(worldFilterMode)) {
+            // 白名单模式：只有在列表中的世界才允许
+            return inList;
+        } else if ("blacklist".equals(worldFilterMode)) {
+            // 黑名单模式：不在列表中的世界才允许
+            return !inList;
+        }
+
+        // 默认允许
+        return true;
     }
 }
