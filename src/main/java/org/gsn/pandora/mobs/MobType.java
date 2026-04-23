@@ -26,6 +26,13 @@ public class MobType {
     private final double armor;
     private final MobOptions options;
     private final Map<TriggerType, List<String>> triggerSkills;
+    private final List<MobDrop> drops;
+    private final MobEquipment equipment;
+    private final long timerIntervalTicks;
+    /** AI 脚本路径（相对 scripts/），null 表示不使用 JS AI */
+    private final String aiScript;
+    /** AI 脚本函数名 */
+    private final String aiFunction;
 
     public MobType(String id,
                    EntityType entityType,
@@ -35,7 +42,12 @@ public class MobType {
                    double damage,
                    double armor,
                    MobOptions options,
-                   Map<TriggerType, List<String>> triggerSkills) {
+                   Map<TriggerType, List<String>> triggerSkills,
+                   List<MobDrop> drops,
+                   MobEquipment equipment,
+                   long timerIntervalTicks,
+                   String aiScript,
+                   String aiFunction) {
         this.id = id;
         this.entityType = entityType;
         this.displayName = displayName;
@@ -45,6 +57,11 @@ public class MobType {
         this.armor = armor;
         this.options = options;
         this.triggerSkills = triggerSkills;
+        this.drops = drops == null ? Collections.emptyList() : drops;
+        this.equipment = equipment;
+        this.timerIntervalTicks = timerIntervalTicks;
+        this.aiScript = aiScript;
+        this.aiFunction = aiFunction;
     }
 
     public String getId() {
@@ -88,6 +105,30 @@ public class MobType {
             return Collections.emptyList();
         }
         return list;
+    }
+
+    public List<MobDrop> getDrops() {
+        return drops;
+    }
+
+    public MobEquipment getEquipment() {
+        return equipment;
+    }
+
+    public long getTimerIntervalTicks() {
+        return timerIntervalTicks;
+    }
+
+    public String getAiScript() {
+        return aiScript;
+    }
+
+    public String getAiFunction() {
+        return aiFunction;
+    }
+
+    public boolean hasAiScript() {
+        return aiScript != null && !aiScript.isEmpty();
     }
 
     /**

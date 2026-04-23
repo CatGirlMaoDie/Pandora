@@ -1,6 +1,6 @@
 # Pandora 插件使用文档（适用于 Paper 1.21.x）
 
-> 说明：Pandora 使用 **目录式配置结构**。`mobs.yml` / `skills.yml` / `spawners.yml` 是顶层索引文件，用来控制加载哪些子文件，而真正的自定义内容应放在对应的 **子目录** 中：`mobs/`、`skills/`、`spawners/`。这样可以把不同副本/模块拆分到多个文件，便于管理和扩展。
+> 说明：Pandora 使用 **目录式配置结构**。真正的自定义内容放在对应的子目录中：`mobs/`、`skills/`、`spawners/`。插件会自动扫描并加载这些目录下的所有 `.yml` 文件，无需手动维护索引列表。
 
 ## 1. 插件简介
 
@@ -53,80 +53,42 @@ io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT
 ```text
 plugins/Pandora/
   ├─ config.yml
-  ├─ mobs.yml
-  ├─ skills.yml
-  ├─ spawners.yml
   ├─ mobs/
-  │   └─ example_mobs.yml
+  │   └─ example_mob.yml
   ├─ skills/
-  │   └─ example_skills.yml
-  └─ spawners/
-      └─ example_spawners.yml
+  │   └─ example_skill.yml
+  ├─ spawners/
+  │   └─ example_spawner.yml
+  └─ scripts/
+      ├─ skills/
+      │   └─ example_skills.js
+      ├─ conditions/
+      │   └─ example_conditions.js
+      └─ spawners/
+          └─ example_spawners.js
 ```
 
 含义：
 
-- `config.yml`：整体配置（例如 debug 开关，后续扩展用）。
-- `mobs.yml`：用于 "索引" 应加载的 Mob 配置文件列表。
-- `skills.yml`：用于 "索引" 应加载的 Skill 配置文件列表。
-- `spawners.yml`：用于 "索引" 应加载的 Spawner 配置文件列表。
-- `mobs/`：放所有实际的自定义怪物配置文件。
-- `skills/`：放所有实际的技能配置文件。
-- `spawners/`：放所有实际的刷怪点配置文件。
+- `config.yml`：整体配置（debug 开关、JavaScript 开关、刷怪全局参数等）。
+- `mobs/`：放所有实际的自定义怪物配置文件，插件自动加载目录下所有 `.yml`。
+- `skills/`：放所有实际的技能配置文件，同上。
+- `spawners/`：放所有实际的刷怪点配置文件，同上。
+- `scripts/`：JavaScript 扩展脚本目录。
 
-> 默认情况下，`example_mobs.yml` / `example_skills.yml` / `example_spawners.yml` 提供了一套演示配置，便于你快速体验。
+> 只需把你的配置文件放入对应子目录，执行 `/pandora reload` 即可生效，无需维护任何索引文件。
 
 ---
 
-## 4. 顶层索引文件的用法（mobs.yml / skills.yml / spawners.yml）
+## 4. 配置文件管理
 
-### 4.1 顶层 mobs.yml
+Pandora 会自动扫描并加载 `mobs/`、`skills/`、`spawners/` 目录下的所有 `.yml` 文件。
 
-作用：告诉 Pandora 要从 `plugins/Pandora/mobs/` 目录中加载哪些子文件。
+**添加新配置**：直接在对应目录新建 `.yml` 文件，执行 `/pandora reload` 即可。
 
-参考示例：
+**禁用某个文件**：将文件重命名为非 `.yml` 后缀（如 `.yml.disabled`），或直接删除。
 
-```yaml
-# 顶层 mobs.yml —— 只写文件名列表，不写具体 Mob 内容
-
-files:
-  - example_mobs.yml     # 会从 plugins/Pandora/mobs/example_mobs.yml 加载
-  - dungeon_mobs.yml     # 你自己新增的地牢怪物配置
-  - boss_mobs.yml        # 你自己新增的 Boss 配置
-```
-
-注意：
-
-- 插件会在 `plugins/Pandora/mobs/` 下寻找这些文件。
-- 若想禁用某一批怪，只需要把对应文件名从 `files:` 列表中删掉/注释即可。
-
-### 4.2 顶层 skills.yml
-
-作用：告诉 Pandora 要从 `plugins/Pandora/skills/` 目录中加载哪些技能配置文件。
-
-示例：
-
-```yaml
-files:
-  - example_skills.yml
-  - dungeon_skills.yml
-  - boss_skills.yml
-```
-
-### 4.3 顶层 spawners.yml
-
-作用：告诉 Pandora 要从 `plugins/Pandora/spawners/` 目录中加载哪些刷怪点配置文件。
-
-示例：
-
-```yaml
-files:
-  - example_spawners.yml
-  - dungeon_spawners.yml
-  - world_boss_spawners.yml
-```
-
-> 总结：**顶层 yml ≈ 加载清单**，真正的内容都放到对应子目录里。
+**注意**：同一目录下不同文件中不能出现相同的 ID（如两个文件都定义了 `SkeletonKing`），重复 ID 会被跳过并打印警告。
 
 ---
 
@@ -148,6 +110,7 @@ MobId:
   Damage: <基础攻击力>
   Armor: <护甲值>
   Faction: <阵营字符串，可选>
+  Timer: <定时触发间隔，如 10s / 200 / 5000ms，可选>
   Options:
     Silent: <true/false>
     PreventOtherDrops: <true/false>
@@ -161,9 +124,18 @@ MobId:
     FollowRange: <跟随攻击范围 double>
     KnockbackResistance: <击退抗性 double>
     AttackSpeed: <攻击速度 double>
+  Equipment:
+    MainHand: <材质 ID>
+    OffHand: <材质 ID>
+    Helmet: <材质 ID>
+    Chestplate: <材质 ID>
+    Leggings: <材质 ID>
+    Boots: <材质 ID>
+    MainHandDropChance: <0-1，默认 0>
+    HelmetDropChance: <0-1，默认 0>
+    # 其他槽位同理
   Skills:
     <触发器名称>:
-      - <Skill 名称>
       - <Skill 名称>
   AI:
     Script: mobs/ai/example_ai.js
@@ -174,25 +146,11 @@ MobId:
 
 字段说明：
 
-- `MobId`：自定义 Mob 的 ID，在 `spawners/*.yml` 和 `/pandora spawn` 里使用。
-- `Type`：Bukkit 原版实体类型，如 `ZOMBIE`、`SKELETON`、`WITHER_SKELETON` 等；也可以直接写常见的中文名（例如 `僵尸`、`骷髅`、`凋零骷髅`），Pandora 会尝试自动匹配。
-- `Faction`：阵营字符串，可选，例如 `Undead`、`Human`，后续可以在技能/条件中用于阵营判断。
-- `Drops` 中的物品 ID：可以写原版枚举 ID（如 `DIAMOND`）、完整命名空间（如 `minecraft:diamond`，按物品枚举解析），也可以写一些常见中文名（如 `钻石`、`面包`），插件会做简单映射。
-- `OnBlock` 条件中的 `type`：同样支持原版枚举 ID（`STONE`）或常见中文名（`石头` 等）。
-- `Display`：显示名称，支持 `&c` 之类的颜色代码。
-- `Health`：最大生命值。
-- `Damage`：基础攻击力（通过 `ATTACK_DAMAGE` 属性设置）。
-- `Armor`：护甲值（通过 `ARMOR` 属性设置）。
-- `Options`：
-  - `Silent`：是否静音（不发出声音）。
-  - `PreventOtherDrops`：是否清空原版掉落，只保留你配置的掉落。
-  - `Despawn`：`true` = 可自然消失，`false` = 不自然消失。
-  - `MovementSpeed`：移动速度（`MOVEMENT_SPEED` 属性）。
-  - `NoAI`：是否关闭原版 AI。
-  - `Glowing` / `Invisible` / `HasGravity` / `Collidable` / `FollowRange` / `KnockbackResistance` / `AttackSpeed`：对应 Bukkit 实体属性控制。
-- `Skills`：静态触发器 → 技能名列表（见后文 Trigger 说明）。
-- `AI`：Mob 级别 AI 配置（见下文 5.1.3），允许用 JavaScript 决定在不同触发器下要释放哪些 Skill。
-- `Drops`：掉落配置，格式为 `<物品 ID> <最小数量>-<最大数量> <概率>`。
+- `Timer`：定时触发间隔，支持 `10s`（秒）、`200`（tick）、`5000ms`（毫秒）。设置后每隔该时间触发一次 `onTimer` 技能。
+- `Equipment`：为 Mob 装备物品。`*DropChance` 控制该槽位物品的掉落概率（0 = 不掉落，1 = 必掉落）。
+- `Drops`：自定义掉落表，格式 `<材质> [数量或范围] [概率]`。设置后会替换原版掉落（无需再设 `PreventOtherDrops`）。
+- `AI.Script`：Mob 级 JS AI 脚本路径（相对 `scripts/` 目录）。优先于静态 `Skills` 映射执行。
+- `AI.Function`：JS 脚本中的函数名，默认 `decideSkills`。
 
 #### 5.1.2 Mob 级 AI：静态 Skills + JavaScript AI
 
@@ -306,7 +264,8 @@ Skills:
 - `onHurt`：该 Mob 被伤害时触发。
 - `onDeath`：该 Mob 死亡时触发。
 - `onKill`：该 Mob 杀死目标时触发。
-- `onCombat`：该 Mob 确立仇恨目标时触发（视监听器实现）。
+- `onCombat`：该 Mob 确立仇恨目标时触发。
+- `onTimer`：按 `Timer:` 配置的间隔定时触发。
 
 ### 5.2 自定义 Skills（`skills/*.yml`）
 
@@ -571,28 +530,11 @@ SpawnerId:
    - `skills/dungeon_skills.yml`
    - `spawners/dungeon_spawners.yml`
 
-2. 在对应的顶层索引文件中增加：
+2. 执行 `/pandora reload` 重载配置，插件会自动扫描并加载所有 `.yml` 文件。
 
-```yaml
-# mobs.yml
-files:
-  - example_mobs.yml
-  - dungeon_mobs.yml
+3. 使用 `/pandora spawn <mobId>`、`/pandora spawner tp <id>` 等指令测试实际效果。
 
-# skills.yml
-files:
-  - example_skills.yml
-  - dungeon_skills.yml
-
-# spawners.yml
-files:
-  - example_spawners.yml
-  - dungeon_spawners.yml
-```
-
-3. `/pandora reload` 重载配置。
-4. 使用 `/pandora spawn`、`/pandora spawner tp` 等指令测试实际效果。
-5. 若要禁用/分批加载某些配置文件，只需要在顶层 `files:` 列表中移除文件名即可，无需移动/删除子文件。
+4. 若要禁用某个配置文件，将其重命名为非 `.yml` 后缀（如 `.yml.disabled`）后重载即可。
 
 ---
 

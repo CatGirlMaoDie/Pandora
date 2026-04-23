@@ -20,9 +20,9 @@ public final class Pandora extends JavaPlugin {
 
         // 保存默认配置文件
         saveDefaultConfig();
-        saveResource("mobs.yml", false);
-        saveResource("skills.yml", false);
-        saveResource("spawners.yml", false);
+        saveDefaultDirectoryResource("mobs", "example_mob.yml");
+        saveDefaultDirectoryResource("skills", "example_skill.yml");
+        saveDefaultDirectoryResource("spawners", "example_spawner.yml");
 
         // 初始化配置服务
         this.configService = new PandoraConfigService(this);
@@ -81,6 +81,20 @@ public final class Pandora extends JavaPlugin {
     public void onDisable() {
         if (spawnerManager != null) {
             spawnerManager.stopTask();
+        }
+    }
+
+    /**
+     * 若目录下不存在该文件，则从 jar 内复制默认示例文件到对应子目录。
+     */
+    private void saveDefaultDirectoryResource(String dirName, String fileName) {
+        java.io.File dir = new java.io.File(getDataFolder(), dirName);
+        if (!dir.exists()) {
+            dir.mkdirs();
+        }
+        java.io.File target = new java.io.File(dir, fileName);
+        if (!target.exists()) {
+            saveResource(dirName + "/" + fileName, false);
         }
     }
 }

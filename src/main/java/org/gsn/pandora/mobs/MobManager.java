@@ -19,13 +19,14 @@ import java.util.*;
 import java.util.logging.Level;
 
 /**
- * 负责加载 mobs.yml 并在世界中生成 Pandora 自定义实体。
+ * 负责加载 mobs/ 目录配置并在世界中生成 Pandora 自定义实体。
  */
 public class MobManager {
 
     private final JavaPlugin plugin;
     private final PandoraConfigService configService;
     private final NamespacedKey mobIdKey;
+    static final NamespacedKey FACTION_KEY = new NamespacedKey("pandora", "faction");
 
     private final Map<String, MobType> mobTypes = new HashMap<>();
 
@@ -40,25 +41,22 @@ public class MobManager {
 
         FileConfiguration config = configService.getMobsConfig();
         if (config == null) {
-            plugin.getLogger().warning("mobs.yml 尚未加载，无法构建 MobType。");
+            plugin.getLogger().warning("mobs 配置尚未加载，无法构建 MobType。");
             return;
         }
 
         for (String id : config.getKeys(false)) {
             ConfigurationSection section = config.getConfigurationSection(id);
-            if (section == null) {
-                continue;
-            }
+            if (section == null) continue;
 
             String typeName = section.getString("Type", "ZOMBIE");
             EntityType entityType;
             try {
                 entityType = EntityType.valueOf(typeName.toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException ex) {
-                // 先按原版 ID 解析失败，再尝试按英文名/中文名匹配
                 entityType = EntityUtil.matchEntityTypeByNameOrChinese(typeName);
                 if (entityType == null) {
-                    plugin.getLogger().log(Level.WARNING, "mobs.yml 中 " + id + " 的 Type 无效: " + typeName, ex);
+                    plugin.getLogger().log(Level.WARNING, "mobs 中 " + id + " 的 Type 无效: " + typeName, ex);
                     continue;
                 }
             }
@@ -67,154 +65,140 @@ public class MobManager {
             String faction = section.getString("Faction");
             double health = section.getDouble("Health", 20.0);
             double damage = section.getDouble("Damage", 2.0);
-            double armor = section.getDouble("Armor", 0.0);
+            double armor  = section.getDouble("Armor", 0.0);
 
-
+            // --- Options ---
             ConfigurationSection optionsSection = section.getConfigurationSection("Options");
             boolean silent = false;
-            Boolean preventOtherDrops = null;
-            Boolean despawn = null;
-            Double movementSpeed = null;
-            Boolean noAI = null;
-            Boolean glowing = null;
-            Boolean invisible = null;
-            Boolean hasGravity = null;
-            Boolean collidable = null;
-            Double followRange = null;
-            Double knockbackResistance = null;
-            Double attackSpeed = null;
-            Map<TriggerType, List<String>> triggerSkills = new EnumMap<>(TriggerType.class);
+            Boolean preventOtherDrops = null, despawn = null, noAI = null;
+            Boolean glowing = null, invisible = null, hasGravity = null, collidable = null;
+            Double movementSpeed = null, followRange = null, knockbackResistance = null, attackSpeed = null;
 
             if (optionsSection != null) {
                 silent = optionsSection.getBoolean("Silent", false);
-                if (optionsSection.contains("PreventOtherDrops")) {
-                    preventOtherDrops = optionsSection.getBoolean("PreventOtherDrops");
-                }
-                if (optionsSection.contains("Despawn")) {
-                    despawn = optionsSection.getBoolean("Despawn");
-                }
-                if (optionsSection.contains("MovementSpeed")) {
-                    movementSpeed = optionsSection.getDouble("MovementSpeed");
-                }
-                if (optionsSection.contains("NoAI")) {
-                    noAI = optionsSection.getBoolean("NoAI");
-                }
-                if (optionsSection.contains("Glowing")) {
-                    glowing = optionsSection.getBoolean("Glowing");
-                }
-                if (optionsSection.contains("Invisible")) {
-                    invisible = optionsSection.getBoolean("Invisible");
-                }
-                if (optionsSection.contains("HasGravity")) {
-                    hasGravity = optionsSection.getBoolean("HasGravity");
-                }
-                if (optionsSection.contains("Collidable")) {
-                    collidable = optionsSection.getBoolean("Collidable");
-                }
-                if (optionsSection.contains("FollowRange")) {
-                    followRange = optionsSection.getDouble("FollowRange");
-                }
-                if (optionsSection.contains("KnockbackResistance")) {
-                    knockbackResistance = optionsSection.getDouble("KnockbackResistance");
-                }
-                if (optionsSection.contains("AttackSpeed")) {
-                    attackSpeed = optionsSection.getDouble("AttackSpeed");
-                }
+                if (optionsSection.contains("PreventOtherDrops"))   preventOtherDrops   = optionsSection.getBoolean("PreventOtherDrops");
+                if (optionsSection.contains("Despawn"))             despawn             = optionsSection.getBoolean("Despawn");
+                if (optionsSection.contains("MovementSpeed"))       movementSpeed       = optionsSection.getDouble("MovementSpeed");
+                if (optionsSection.contains("NoAI"))                noAI                = optionsSection.getBoolean("NoAI");
+                if (optionsSection.contains("Glowing"))             glowing             = optionsSection.getBoolean("Glowing");
+                if (optionsSection.contains("Invisible"))           invisible           = optionsSection.getBoolean("Invisible");
+                if (optionsSection.contains("HasGravity"))          hasGravity          = optionsSection.getBoolean("HasGravity");
+                if (optionsSection.contains("Collidable"))          collidable          = optionsSection.getBoolean("Collidable");
+                if (optionsSection.contains("FollowRange"))         followRange         = optionsSection.getDouble("FollowRange");
+                if (optionsSection.contains("KnockbackResistance")) knockbackResistance = optionsSection.getDouble("KnockbackResistance");
+                if (optionsSection.contains("AttackSpeed"))         attackSpeed         = optionsSection.getDouble("AttackSpeed");
             }
 
-            // 解析每个触发器绑定的技能列表
+            // --- Skills ---
+            Map<TriggerType, List<String>> triggerSkills = new EnumMap<>(TriggerType.class);
             ConfigurationSection skillsSection = section.getConfigurationSection("Skills");
             if (skillsSection != null) {
                 for (String triggerKey : skillsSection.getKeys(false)) {
                     TriggerType triggerType = TriggerType.fromConfigString(triggerKey);
                     if (triggerType == null) {
-                        plugin.getLogger().warning("mobs.yml 中 " + id + " 的 Skills 节点存在未知触发器: " + triggerKey);
-                        continue;
-                    }
-                    List<String> rawList = skillsSection.getStringList(triggerKey);
-                    if (rawList == null || rawList.isEmpty()) {
+                        plugin.getLogger().warning("mobs 中 " + id + " 的 Skills 节点存在未知触发器: " + triggerKey);
                         continue;
                     }
                     List<String> skillNames = new ArrayList<>();
-                    for (String rawSkill : rawList) {
-                        if (rawSkill == null) {
-                            continue;
-                        }
-                        String trimmed = rawSkill.trim();
-                        if (!trimmed.isEmpty()) {
-                            skillNames.add(trimmed);
-                        }
+                    for (String rawSkill : skillsSection.getStringList(triggerKey)) {
+                        if (rawSkill != null && !rawSkill.trim().isEmpty()) skillNames.add(rawSkill.trim());
                     }
-                    if (!skillNames.isEmpty()) {
-                        triggerSkills.put(triggerType, skillNames);
-                    }
+                    if (!skillNames.isEmpty()) triggerSkills.put(triggerType, skillNames);
                 }
             }
 
+            // --- Drops ---
+            List<MobDrop> drops = new ArrayList<>();
+            for (String rawDrop : section.getStringList("Drops")) {
+                MobDrop drop = MobDrop.parse(rawDrop);
+                if (drop != null) drops.add(drop);
+                else plugin.getLogger().warning("mobs 中 " + id + " 的 Drops 条目无法解析: " + rawDrop);
+            }
+
+            // --- Equipment ---
+            MobEquipment equipment = null;
+            ConfigurationSection eqSection = section.getConfigurationSection("Equipment");
+            if (eqSection != null) {
+                equipment = new MobEquipment(
+                    MobEquipment.parseMaterial(eqSection.getString("MainHand")),
+                    MobEquipment.parseMaterial(eqSection.getString("OffHand")),
+                    MobEquipment.parseMaterial(eqSection.getString("Helmet")),
+                    MobEquipment.parseMaterial(eqSection.getString("Chestplate")),
+                    MobEquipment.parseMaterial(eqSection.getString("Leggings")),
+                    MobEquipment.parseMaterial(eqSection.getString("Boots")),
+                    (float) eqSection.getDouble("MainHandDropChance", 0.0),
+                    (float) eqSection.getDouble("OffHandDropChance", 0.0),
+                    (float) eqSection.getDouble("HelmetDropChance", 0.0),
+                    (float) eqSection.getDouble("ChestplateDropChance", 0.0),
+                    (float) eqSection.getDouble("LeggingsDropChance", 0.0),
+                    (float) eqSection.getDouble("BootsDropChance", 0.0)
+                );
+            }
+
+            // --- Timer ---
+            long timerIntervalTicks = 0L;
+            if (section.contains("Timer")) {
+                timerIntervalTicks = parseInterval(section.getString("Timer", "0"));
+            }
+
+            // --- AI Script ---
+            String aiScript = null;
+            String aiFunction = "decideSkills";
+            ConfigurationSection aiSection = section.getConfigurationSection("AI");
+            if (aiSection != null) {
+                aiScript = aiSection.getString("Script");
+                String func = aiSection.getString("Function");
+                if (func != null && !func.isEmpty()) aiFunction = func;
+            }
+
             MobType.MobOptions options = new MobType.MobOptions(
-                silent,
-                preventOtherDrops,
-                despawn,
-                movementSpeed,
-                noAI,
-                glowing,
-                invisible,
-                hasGravity,
-                collidable,
-                followRange,
-                knockbackResistance,
-                attackSpeed
+                silent, preventOtherDrops, despawn, movementSpeed,
+                noAI, glowing, invisible, hasGravity, collidable,
+                followRange, knockbackResistance, attackSpeed
             );
 
-            String key = id.toLowerCase(Locale.ROOT);
-            MobType mobType = new MobType(id, entityType, display, faction, health, damage, armor, options, triggerSkills);
-            mobTypes.put(key, mobType);
+            MobType mobType = new MobType(id, entityType, display, faction, health, damage, armor,
+                options, triggerSkills, drops, equipment, timerIntervalTicks, aiScript, aiFunction);
+            mobTypes.put(id.toLowerCase(Locale.ROOT), mobType);
         }
 
         plugin.getLogger().info("已加载 " + mobTypes.size() + " 个自定义 Mob 类型。");
     }
 
-    public MobType getMobType(String id) {
-        if (id == null) {
-            return null;
+    private long parseInterval(String raw) {
+        if (raw == null || raw.isBlank()) return 0L;
+        String s = raw.trim().toLowerCase(Locale.ROOT);
+        try {
+            if (s.endsWith("ms")) return Math.max(1L, Long.parseLong(s.substring(0, s.length() - 2)) / 50L);
+            if (s.endsWith("s"))  return Math.max(1L, Long.parseLong(s.substring(0, s.length() - 1)) * 20L);
+            return Math.max(1L, Long.parseLong(s));
+        } catch (NumberFormatException e) {
+            return 0L;
         }
+    }
+
+    public MobType getMobType(String id) {
+        if (id == null) return null;
         return mobTypes.get(id.toLowerCase(Locale.ROOT));
     }
 
     public MobType getMobTypeByEntity(Entity entity) {
-        if (!(entity instanceof LivingEntity)) {
-            return null;
-        }
-        PersistentDataContainer pdc = entity.getPersistentDataContainer();
-        String id = pdc.get(mobIdKey, PersistentDataType.STRING);
-        if (id == null) {
-            return null;
-        }
+        if (!(entity instanceof LivingEntity)) return null;
+        String id = entity.getPersistentDataContainer().get(mobIdKey, PersistentDataType.STRING);
+        if (id == null) return null;
         return getMobType(id);
     }
 
-    /**
-     * 在指定位置生成指定 ID 的 Mob。
-     *
-     * @return 生成成功的实体，失败返回 null
-     */
     public LivingEntity spawn(String id, Location location) {
         MobType mobType = getMobType(id);
-        if (mobType == null) {
-            return null;
-        }
+        if (mobType == null) return null;
         return spawn(mobType, location);
     }
 
     public LivingEntity spawn(MobType mobType, Location location) {
-        if (location == null) {
-            return null;
-        }
-
+        if (location == null) return null;
         World world = location.getWorld();
-        if (world == null) {
-            return null;
-        }
+        if (world == null) return null;
 
         Entity entity = world.spawnEntity(location, mobType.getEntityType());
         if (!(entity instanceof LivingEntity)) {
@@ -224,21 +208,30 @@ public class MobManager {
         }
 
         LivingEntity living = (LivingEntity) entity;
-        // 应用静态属性
         mobType.applyTo(living);
 
-        // 标记为 Pandora Mob
         PersistentDataContainer pdc = living.getPersistentDataContainer();
         pdc.set(mobIdKey, PersistentDataType.STRING, mobType.getId());
+
+        // 写入 faction，供 FactionCondition 使用
+        if (mobType.getFaction() != null && !mobType.getFaction().isEmpty()) {
+            pdc.set(FACTION_KEY, PersistentDataType.STRING, mobType.getFaction());
+        }
+
+        // 应用装备
+        if (mobType.getEquipment() != null && living.getEquipment() != null) {
+            mobType.getEquipment().applyTo(living.getEquipment());
+        }
 
         return living;
     }
 
     public boolean isPandoraMob(Entity entity) {
-        if (!(entity instanceof LivingEntity)) {
-            return false;
-        }
-        PersistentDataContainer pdc = entity.getPersistentDataContainer();
-        return pdc.has(mobIdKey, PersistentDataType.STRING);
+        if (!(entity instanceof LivingEntity)) return false;
+        return entity.getPersistentDataContainer().has(mobIdKey, PersistentDataType.STRING);
+    }
+
+    public Collection<MobType> getAllMobTypes() {
+        return Collections.unmodifiableCollection(mobTypes.values());
     }
 }

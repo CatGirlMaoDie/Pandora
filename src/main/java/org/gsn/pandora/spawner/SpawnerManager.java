@@ -8,10 +8,11 @@ import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.scheduler.BukkitTask;
 import org.gsn.pandora.config.PandoraConfigService;
 import org.gsn.pandora.mobs.MobManager;
 import org.gsn.pandora.skills.SkillParser;
+import org.gsn.pandora.util.FoliaScheduler;
+import org.gsn.pandora.util.PandoraTask;
 import org.gsn.pandora.script.ScriptingService;
 
 import java.util.*;
@@ -37,7 +38,7 @@ public class SpawnerManager {
     private final Map<String, List<SpawnerCondition>> conditions = new HashMap<>();
     private final Map<UUID, Long> entityFarAwayTime = new HashMap<>();
 
-    private BukkitTask task;
+    private PandoraTask task;
     private boolean globalEnabled = true;
     private long checkInterval = 20L;
     private String worldFilterMode = "whitelist";
@@ -160,7 +161,7 @@ public class SpawnerManager {
     public void startTask() {
         stopTask();
         // 使用配置的检查间隔
-        task = plugin.getServer().getScheduler().runTaskTimer(plugin, this::tick, checkInterval, checkInterval);
+        task = FoliaScheduler.runGlobalTaskTimer(plugin, this::tick, checkInterval, checkInterval);
     }
 
     public void stopTask() {
@@ -232,24 +233,16 @@ public class SpawnerManager {
                 case "playersinradius": {
                     double radius = parseDouble(args.get("r"), 32.0);
                     int min = (int) parseDouble(args.get("min"), 1.0);
-                    if (min < 0) {
-                        min = 0;
-                    }
+                    if (min < 0) min = 0;
                     final double r = radius;
+                    final double rSq = r * r;
                     final int minPlayers = min;
                     result.add(center -> {
-                        if (center == null || center.getWorld() == null) {
-                            return false;
-                        }
+                        if (center == null) return false;
+                        org.bukkit.World world = center.getWorld();
+                        if (world == null) return false;
                         int count = 0;
-                        double rSq = r * r;
-                        for (Player player : center.getWorld().getPlayers()) {
-                            if (!player.isOnline()) {
-                                continue;
-                            }
-                            if (!player.getWorld().equals(center.getWorld())) {
-                                continue;
-                            }
+                        for (Player player : world.getPlayers()) {
                             if (player.getLocation().distanceSquared(center) <= rSq) {
                                 count++;
                             }
@@ -266,14 +259,11 @@ public class SpawnerManager {
                     final long f = from;
                     final long t = to;
                     result.add(center -> {
-                        if (center == null || center.getWorld() == null) {
-                            return false;
-                        }
-                        long time = center.getWorld().getTime();
-                        if (f <= t) {
-                            return time >= f && time <= t;
-                        }
-                        // 跨越 0 点的区间，例如 23000-1000
+                        if (center == null) return false;
+                        org.bukkit.World world = center.getWorld();
+                        if (world == null) return false;
+                        long time = world.getTime();
+                        if (f <= t) return time >= f && time <= t;
                         return time >= f || time <= t;
                     });
                     break;
@@ -290,11 +280,10 @@ public class SpawnerManager {
                     final String scriptFile = file;
                     final String funcName = func;
                     final String spawnerId = id;
+                    // bindings map 在 lambda 内创建，避免跨调用共享状态
                     result.add(center -> {
-                        if (center == null || center.getWorld() == null) {
-                            return false;
-                        }
-                        Map<String, Object> bindings = new HashMap<>();
+                        if (center == null || center.getWorld() == null) return false;
+                        Map<String, Object> bindings = new HashMap<>(2);
                         bindings.put("center", center);
                         bindings.put("spawnerId", spawnerId);
                         Object r = scriptingService.call("spawners/" + scriptFile, funcName, bindings);

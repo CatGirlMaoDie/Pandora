@@ -174,23 +174,57 @@ public class PandoraCommand extends Command {
 
     @Override
     public List<String> tabComplete(CommandSender sender, String alias, String[] args) {
-        if (args.length == 1) {
-            List<String> subs = new ArrayList<>();
-            subs.add("reload");
-            subs.add("spawn");
-            subs.add("spawner");
-            subs.add("debug");
+        if (!sender.hasPermission("pandora.admin")) return Collections.emptyList();
 
-            String prefix = args[0].toLowerCase();
-            List<String> result = new ArrayList<>();
-            for (String s : subs) {
-                if (s.startsWith(prefix)) {
-                    result.add(s);
+        // args[0] = 子命令
+        if (args.length == 1) {
+            return filterPrefix(List.of("reload", "spawn", "spawner", "debug"), args[0]);
+        }
+
+        String sub = args[0].toLowerCase();
+
+        // /pandora spawn <mobId> [amount]
+        if (sub.equals("spawn")) {
+            if (args.length == 2 && plugin instanceof Pandora pandora && pandora.getMobManager() != null) {
+                List<String> ids = pandora.getMobManager().getAllMobTypes()
+                    .stream().map(t -> t.getId()).collect(java.util.stream.Collectors.toList());
+                return filterPrefix(ids, args[1]);
+            }
+            return Collections.emptyList();
+        }
+
+        // /pandora spawner <sub> [id] ...
+        if (sub.equals("spawner")) {
+            if (args.length == 2) {
+                return filterPrefix(List.of("list", "info", "tp", "teleport", "create", "remove"), args[1]);
+            }
+            String spawnerSub = args[1].toLowerCase();
+            if (plugin instanceof Pandora pandora && pandora.getSpawnerManager() != null) {
+                if ((spawnerSub.equals("info") || spawnerSub.equals("tp")
+                        || spawnerSub.equals("teleport") || spawnerSub.equals("remove")) && args.length == 3) {
+                    List<String> ids = pandora.getSpawnerManager().getAllSpawners()
+                        .stream().map(d -> d.getId()).collect(java.util.stream.Collectors.toList());
+                    return filterPrefix(ids, args[2]);
+                }
+                if (spawnerSub.equals("create") && args.length == 4
+                        && pandora.getMobManager() != null) {
+                    List<String> ids = pandora.getMobManager().getAllMobTypes()
+                        .stream().map(t -> t.getId()).collect(java.util.stream.Collectors.toList());
+                    return filterPrefix(ids, args[3]);
                 }
             }
-            return result;
+            return Collections.emptyList();
         }
 
         return Collections.emptyList();
+    }
+
+    private List<String> filterPrefix(List<String> options, String prefix) {
+        String lower = prefix.toLowerCase();
+        List<String> result = new ArrayList<>();
+        for (String s : options) {
+            if (s.toLowerCase().startsWith(lower)) result.add(s);
+        }
+        return result;
     }
 }

@@ -1,0 +1,76 @@
+# Pandora 自定义实体示例
+# 每个文件对应一个或多个 Mob 定义，文件名可自由命名。
+# 插件会自动加载 mobs/ 目录下所有 .yml 文件。
+
+SkeletonKing:
+  Type: WITHER_SKELETON
+  Display: '&cSkeleton King'
+  Health: 200
+  Damage: 10
+  Armor: 5
+  Faction: Undead
+  # Timer: 每隔多久触发一次 onTimer 技能（支持 10s / 200tick / 5000ms）
+  Timer: 10s
+  Options:
+    Silent: true
+    PreventOtherDrops: true
+    Despawn: true
+    MovementSpeed: 0.3
+  Equipment:
+    MainHand: IRON_SWORD
+    Helmet: WITHER_SKELETON_SKULL
+    MainHandDropChance: 0.05
+    HelmetDropChance: 0.02
+  Skills:
+    onSpawn:
+      - FireNova
+    onHurt:
+      - FireNova
+      - SelfHeal
+    onAttack:
+      - ConeFlame
+    onKill:
+      - SummonMinions
+    onTimer:
+      - FireNova
+  # Drops: 自定义掉落表（格式：<材质> [数量或范围] [概率0-1]）
+  # 设置后会替换原版掉落
+  Drops:
+    - minecraft:diamond 1-3 0.15
+    - minecraft:bone 2-5 1.0
+    - minecraft:wither_skeleton_skull 1 0.05
+
+FireZombie:
+  Type: ZOMBIE
+  Display: '&6Fire Zombie'
+  Health: 40
+  Damage: 5
+  Armor: 2
+  Options:
+    Despawn: true
+  Skills:
+    onSpawn:
+      - FireNova
+    onAttack:
+      - LavaPunish
+  Drops:
+    - minecraft:rotten_flesh 1-2 0.8
+    - minecraft:blaze_powder 1 0.2
+
+SkeletonArcher:
+  Type: SKELETON
+  Display: '&eSkeleton Archer'
+  Health: 30
+  Damage: 4
+  Armor: 1
+  Options:
+    Despawn: true
+  Equipment:
+    MainHand: BOW
+    MainHandDropChance: 0.0
+  Skills:
+    onAttack:
+      - ConeFlame
+  Drops:
+    - minecraft:arrow 4-8 1.0
+    - minecraft:bone 1-2 0.5
