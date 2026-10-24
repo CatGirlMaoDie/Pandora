@@ -41,3 +41,23 @@ KnockUp:
   Skills:
     # 击飞附近单位
     - velocity{y=1.0} @playersinradius{r=4}
+
+CallReinforcements:
+  Cooldown: 15
+  Skills:
+    # 收到信号后向周围友军发送信号并治疗自己
+    - sendsignal{s=reinforce} @mobsinradius{r=20}  # 注意: 此处用目标选择器占位，实际使用 area/eir
+    - heal{a=10} @self
+
+GuardCommunication:
+  Cooldown: 5
+  Skills:
+    # 互相发信号通知同伴
+    - sendsignal{s=player_spotted} @eir{r=15}
+    - message{m="&c守卫发现了入侵者！"} @pir{r=30}
+
+ThreatReset:
+  Cooldown: 20
+  Skills:
+    # 清空威胁表并仇恨重置
+    - threatclear{} @self

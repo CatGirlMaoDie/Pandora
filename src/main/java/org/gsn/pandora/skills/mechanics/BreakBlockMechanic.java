@@ -33,8 +33,9 @@ public class BreakBlockMechanic implements Mechanic {
             Block block = loc.clone().subtract(0, 1, 0).getBlock();
             if (block.getType().isAir()) continue;
             if (doEffect) {
-                block.getWorld().playEffect(block.getLocation(),
-                    org.bukkit.Effect.STEP_SOUND, block.getType());
+                block.getWorld().spawnParticle(org.bukkit.Particle.BLOCK,
+                block.getLocation().add(0.5, 0.5, 0.5), 20,
+                block.getBlockData());
             }
             if (doDrops) {
                 block.breakNaturally();

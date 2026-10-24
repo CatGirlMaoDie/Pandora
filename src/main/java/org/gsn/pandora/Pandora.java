@@ -13,6 +13,9 @@ public final class Pandora extends JavaPlugin {
     private SkillManager skillManager;
     private org.gsn.pandora.spawner.SpawnerManager spawnerManager;
     private org.gsn.pandora.script.ScriptingService scriptingService;
+    private org.gsn.pandora.mobs.ThreatTableManager threatTableManager;
+    private org.gsn.pandora.mobs.SignalManager signalManager;
+    private org.gsn.pandora.spawner.RandomSpawnManager randomSpawnManager;
 
     @Override
     public void onEnable() {
@@ -42,10 +45,24 @@ public final class Pandora extends JavaPlugin {
         this.skillManager = new SkillManager(this, this.configService, this.scriptingService);
         this.skillManager.reload();
 
+        // 初始化威胁表与信号管理器
+        this.threatTableManager = new org.gsn.pandora.mobs.ThreatTableManager();
+        this.signalManager = new org.gsn.pandora.mobs.SignalManager();
+
         // 初始化 SpawnerManager
         this.spawnerManager = new org.gsn.pandora.spawner.SpawnerManager(this, this.configService, this.mobManager, this.scriptingService);
         this.spawnerManager.reload();
         this.spawnerManager.startTask();
+
+        // 初始化随机生成（对应 Wiki「随机生成」机制）
+        this.randomSpawnManager = new org.gsn.pandora.spawner.RandomSpawnManager(this);
+        this.randomSpawnManager.setMobManager(this.mobManager);
+        this.randomSpawnManager.reload();
+        this.randomSpawnManager.startTask();
+
+        // 威胁表定期清理
+        org.gsn.pandora.util.FoliaScheduler.runGlobalTaskTimer(this,
+            () -> { if (threatTableManager != null) threatTableManager.cleanup(); }, 600L, 600L);
 
         // 注册事件监听器
         getServer().getPluginManager().registerEvents(
@@ -77,10 +94,28 @@ public final class Pandora extends JavaPlugin {
         return scriptingService;
     }
 
+    public org.gsn.pandora.mobs.ThreatTableManager getThreatTableManager() {
+        return threatTableManager;
+    }
+
+    public org.gsn.pandora.mobs.SignalManager getSignalManager() {
+        return signalManager;
+    }
+
+    public org.gsn.pandora.spawner.RandomSpawnManager getRandomSpawnManager() {
+        return randomSpawnManager;
+    }
+
     @Override
     public void onDisable() {
         if (spawnerManager != null) {
             spawnerManager.stopTask();
+        }
+        if (randomSpawnManager != null) {
+            randomSpawnManager.stopTask();
+        }
+        if (threatTableManager != null) {
+            threatTableManager.removeAll();
         }
     }
 

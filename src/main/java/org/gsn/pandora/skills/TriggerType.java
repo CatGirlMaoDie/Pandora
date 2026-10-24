@@ -9,7 +9,8 @@ public enum TriggerType {
     ON_DEATH,
     ON_KILL,
     ON_COMBAT,
-    ON_TIMER;
+    ON_TIMER,
+    ON_SIGNAL;
 
     public static TriggerType fromConfigString(String raw) {
         if (raw == null) {
@@ -42,6 +43,9 @@ public enum TriggerType {
             case "ontimer":
             case "timer":
                 return ON_TIMER;
+            case "onsignal":
+            case "signal":
+                return ON_SIGNAL;
             default:
                 return null;
         }

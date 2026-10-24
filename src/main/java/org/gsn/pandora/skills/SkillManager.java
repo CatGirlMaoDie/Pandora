@@ -961,6 +961,71 @@ public class SkillManager {
             return new org.gsn.pandora.skills.mechanics.MetaSkillMechanic(skill, this);
         });
 
+        // sendsignal{signal|s|sig=<信号名>}
+        registerMechanic("sendsignal", args -> {
+            String sig = getArg(args, "signal", "s", "sig");
+            if (sig == null || sig.isEmpty()) return null;
+            return new org.gsn.pandora.skills.mechanics.SendSignalMechanic(sig);
+        });
+
+        // threatchange / threatmod{action|mode|a=ADD;amount|a=1}
+        registerMechanic("threatchange", args -> {
+            String action = getArg(args, "action", "mode", "m");
+            double amount = parseDouble(getArg(args, "amount", "a", "value", "v"), 1.0);
+            return new org.gsn.pandora.skills.mechanics.ThreatChangeMechanic(action, amount);
+        });
+        registerMechanic("threatmod", args -> {
+            String action = getArg(args, "action", "mode", "m");
+            double amount = parseDouble(getArg(args, "amount", "a", "value", "v"), 1.0);
+            return new org.gsn.pandora.skills.mechanics.ThreatChangeMechanic(action, amount);
+        });
+
+        // threatclear{}
+        registerMechanic("threatclear", args -> new org.gsn.pandora.skills.mechanics.ThreatClearMechanic());
+
+        // setlevel{level|l=<等级>}
+        registerMechanic("setlevel", args -> {
+            int lvl = (int) parseDouble(getArg(args, "level", "l"), 0.0);
+            return new org.gsn.pandora.skills.mechanics.SetLevelMechanic(lvl);
+        });
+
+        // variableset{variable|var|v|name=<名>;value|val=<值>;type|t=STRING;global|g=false}
+        registerMechanic("variableset", args -> {
+            String name = getArg(args, "variable", "var", "v", "name");
+            String value = getArg(args, "value", "val");
+            String type = getArg(args, "type", "t");
+            boolean global = "true".equalsIgnoreCase(getArg(args, "global", "g"));
+            if (name == null || name.isEmpty()) return null;
+            return new org.gsn.pandora.skills.mechanics.VariableSetMechanic(name, value == null ? "" : value, type, global);
+        });
+        registerMechanic("variableadd", args -> {
+            String name = getArg(args, "variable", "var", "v", "name");
+            String value = getArg(args, "value", "val", "amount", "a");
+            boolean global = "true".equalsIgnoreCase(getArg(args, "global", "g"));
+            if (name == null || name.isEmpty() || value == null) return null;
+            return new org.gsn.pandora.skills.mechanics.VariableAddMechanic(name, value, global);
+        });
+
+        // unsetvariable / varunset{variable|var|v|name=<名>;global|g=false}
+        registerMechanic("unsetvariable", args -> {
+            String name = getArg(args, "variable", "var", "v", "name");
+            boolean global = "true".equalsIgnoreCase(getArg(args, "global", "g"));
+            if (name == null || name.isEmpty()) return null;
+            return new org.gsn.pandora.skills.mechanics.VariableRemoveMechanic(name, global);
+        });
+        registerMechanic("varunset", args -> {
+            String name = getArg(args, "variable", "var", "v", "name");
+            boolean global = "true".equalsIgnoreCase(getArg(args, "global", "g"));
+            if (name == null || name.isEmpty()) return null;
+            return new org.gsn.pandora.skills.mechanics.VariableRemoveMechanic(name, global);
+        });
+        registerMechanic("variableremove", args -> {
+            String name = getArg(args, "variable", "var", "v", "name");
+            boolean global = "true".equalsIgnoreCase(getArg(args, "global", "g"));
+            if (name == null || name.isEmpty()) return null;
+            return new org.gsn.pandora.skills.mechanics.VariableRemoveMechanic(name, global);
+        });
+
         // Targeters
         registerTargeter("self", args -> new SelfTargeter());
         // playersinradius|pir{radius|r=5}
@@ -1712,6 +1777,29 @@ public class SkillManager {
             int max = (int) parseDouble(getArg(args, "maxAmount"), Integer.MAX_VALUE);
             double r = parseDouble(getArg(args, "radius", "r"), 16.0);
             return new org.gsn.pandora.skills.condition.TargetsCondition(min, Math.max(min, max), r);
+        });
+
+        // signal{signal|s|sig=<信号名>} — 配合 sendsignal / onSignal
+        registerCondition("signal", args -> {
+            String sig = getArg(args, "signal", "s", "sig");
+            if (sig == null || sig.isEmpty()) return null;
+            return new org.gsn.pandora.skills.condition.SignalCondition(sig);
+        });
+
+        // variable{variable|var|v|name=<名>;value|val=<期望值>;global|g=false}
+        registerCondition("variable", args -> {
+            String name = getArg(args, "variable", "var", "v", "name");
+            String value = getArg(args, "value", "val");
+            boolean global = "true".equalsIgnoreCase(getArg(args, "global", "g"));
+            if (name == null || name.isEmpty()) return null;
+            return new org.gsn.pandora.skills.condition.VariableCondition(name, value, global);
+        });
+
+        // mobsinlevel / moblevel{level|l=min;maxLevel=max} — Pandora 等级范围
+        registerCondition("moblevel", args -> {
+            int min = (int) parseDouble(getArg(args, "level", "l"), 0.0);
+            int max = (int) parseDouble(getArg(args, "maxLevel"), Integer.MAX_VALUE);
+            return new org.gsn.pandora.skills.condition.MobLevelCondition(min, max);
         });
     }
 

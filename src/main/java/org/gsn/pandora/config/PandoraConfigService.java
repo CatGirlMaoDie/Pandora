@@ -52,9 +52,9 @@ public class PandoraConfigService {
         this.spawnersConfig = loadDirectory("spawners");
     }
 
-    public FileConfiguration getPluginConfig() {
-        return pluginConfig != null ? pluginConfig : plugin.getConfig();
-    }
+//    public FileConfiguration getPluginConfig() {
+//        return pluginConfig != null ? pluginConfig : plugin.getConfig();
+//    }
 
     public FileConfiguration getMobsConfig() {
         return mobsConfig;

@@ -2,7 +2,10 @@ package org.gsn.pandora.listener;
 
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.entity.Player;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
+import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityRemoveEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntitySpawnEvent;
 import org.bukkit.event.entity.EntityTargetLivingEntityEvent;
@@ -83,13 +86,16 @@ public class EntityListener implements Listener {
 
     @EventHandler
     public void onSpawn(EntitySpawnEvent event) {
-        if (!(event.getEntity() instanceof LivingEntity living)) return;
-        if (!mobManager.isPandoraMob(living)) return;
+        if (!(event.getEntity() instanceof LivingEntity living))
+            return;
+        if (!mobManager.isPandoraMob(living))
+            return;
 
         triggerSkills(living, null, TriggerType.ON_SPAWN);
 
         MobType mobType = mobManager.getMobTypeByEntity(living);
-        if (mobType == null || mobType.getTimerIntervalTicks() <= 0) return;
+        if (mobType == null || mobType.getTimerIntervalTicks() <= 0)
+            return;
 
         long interval = mobType.getTimerIntervalTicks();
         UUID uid = living.getUniqueId();
@@ -109,11 +115,44 @@ public class EntityListener implements Listener {
 
         if (mobManager.isPandoraMob(victim)) {
             LivingEntity damager = event.getDamager() instanceof LivingEntity le ? le : null;
+            // 找到实际攻击者（投射物归主）
+            if (damager == null && event.getDamager() instanceof org.bukkit.entity.Projectile proj
+                    && proj.getShooter() instanceof LivingEntity shooter) {
+                damager = shooter;
+            }
             triggerSkills(victim, damager, TriggerType.ON_HURT);
+
+            // 威胁表累计伤害
+            MobType mobType = mobManager.getMobTypeByEntity(victim);
+            if (damager instanceof Player player && mobType != null && mobType.hasThreatTable()
+                    && plugin.getThreatTableManager() != null) {
+                plugin.getThreatTableManager().addThreat(victim, player, event.getFinalDamage());
+            }
+
+            // 伤害调整（对应 Wiki「伤害调整」）：按伤害原因应用倍率
+            if (mobType != null) {
+                double mult = mobType.getDamageModifier(event.getCause().name());
+                if (mult != 1.0) {
+                    event.setDamage(Math.max(0.0, event.getDamage() * mult));
+                }
+            }
         }
 
         if (event.getDamager() instanceof LivingEntity attacker && mobManager.isPandoraMob(attacker)) {
             triggerSkills(attacker, victim, TriggerType.ON_ATTACK);
+        }
+    }
+
+    /** 所有伤害类型（含溺水/摔落等非实体伤害）的伤害调整。 */
+    @EventHandler(ignoreCancelled = true)
+    public void onGenericDamage(EntityDamageEvent event) {
+        if (event instanceof EntityDamageByEntityEvent) return; // 已处理
+        if (!(event.getEntity() instanceof LivingEntity victim)) return;
+        MobType mobType = mobManager.getMobTypeByEntity(victim);
+        if (mobType == null) return;
+        double mult = mobType.getDamageModifier(event.getCause().name());
+        if (mult != 1.0) {
+            event.setDamage(Math.max(0.0, event.getDamage() * mult));
         }
     }
 
@@ -124,6 +163,13 @@ public class EntityListener implements Listener {
         if (mobManager.isPandoraMob(entity)) {
             triggerSkills(entity, null, TriggerType.ON_DEATH);
             cancelTimer(entity.getUniqueId());
+            if (plugin.getThreatTableManager() != null) plugin.getThreatTableManager().clear(entity);
+            if (plugin.getSignalManager() != null) plugin.getSignalManager().remove(entity.getUniqueId());
+            MobType deathType = mobManager.getMobTypeByEntity(entity);
+            if (deathType != null) {
+                try { new org.gsn.pandora.api.PandoraMobDeathEvent(entity, deathType).callEvent(); }
+                catch (Throwable ignored) {}
+            }
 
             MobType mobType = mobManager.getMobTypeByEntity(entity);
             if (mobType != null) {
@@ -156,6 +202,43 @@ public class EntityListener implements Listener {
         if (!(event.getEntity() instanceof LivingEntity entity)) return;
         if (!mobManager.isPandoraMob(entity)) return;
         triggerSkills(entity, event.getTarget(), TriggerType.ON_COMBAT);
+
+        // 威胁表：开启后锁定累计伤害最高的玩家为目标（对应 Wiki「威胁度」）
+        MobType mobType = mobManager.getMobTypeByEntity(entity);
+        if (mobType == null || !mobType.hasThreatTable()) return;
+        var threatTable = plugin.getThreatTableManager();
+        if (threatTable == null) return;
+        Player topThreat = threatTable.getTopThreat(entity);
+        if (topThreat != null && !topThreat.isDead()) {
+            event.setTarget(topThreat);
+            return;
+        }
+
+        // 阵营：同阵营实体不互相索敌（对应 Wiki「阵营」）
+        if (event.getTarget() instanceof LivingEntity targetLiving
+                && mobManager.isPandoraMob(targetLiving)) {
+            MobType targetType = mobManager.getMobTypeByEntity(targetLiving);
+            if (targetType != null && mobType.getFaction() != null
+                    && mobType.getFaction().equalsIgnoreCase(targetType.getFaction())) {
+                event.setCancelled(true);
+            }
+        }
+    }
+
+    @EventHandler
+    public void onEntityRemove(EntityRemoveEvent event) {
+        if (!(event.getEntity() instanceof LivingEntity entity)) return;
+        if (!mobManager.isPandoraMob(entity)) return;
+        // 死亡已在 onDeath 处理并清除了 PDC 之前触发；这里只处理非死亡移除
+        if (event.getCause() == EntityRemoveEvent.Cause.DEATH) return;
+        cancelTimer(entity.getUniqueId());
+        if (plugin.getThreatTableManager() != null) plugin.getThreatTableManager().clear(entity);
+        if (plugin.getSignalManager() != null) plugin.getSignalManager().remove(entity.getUniqueId());
+        MobType mobType = mobManager.getMobTypeByEntity(entity);
+        if (mobType != null) {
+            try { new org.gsn.pandora.api.PandoraMobDespawnEvent(entity, mobType).callEvent(); }
+            catch (Throwable ignored) {}
+        }
     }
 
     private void cancelTimer(UUID uuid) {

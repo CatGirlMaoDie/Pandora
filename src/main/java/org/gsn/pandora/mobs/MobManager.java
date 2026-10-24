@@ -141,6 +141,20 @@ public class MobManager {
                 timerIntervalTicks = parseInterval(section.getString("Timer", "0"));
             }
 
+            // --- 威胁表 / 等级 / 伤害调整 ---
+            boolean threatTable = false;
+            int level = 0;
+            Map<String, Double> damageModifiers = new LinkedHashMap<>();
+            ConfigurationSection dmgModSection = section.getConfigurationSection("DamageModifiers");
+            if (dmgModSection != null) {
+                for (String cause : dmgModSection.getKeys(false)) {
+                    double mult = dmgModSection.getDouble(cause, 1.0);
+                    damageModifiers.put(cause.toUpperCase(Locale.ROOT), mult);
+                }
+            }
+            if (section.contains("ThreatTable")) threatTable = section.getBoolean("ThreatTable", false);
+            if (section.contains("Level")) level = Math.max(0, section.getInt("Level", 0));
+
             // --- AI Script ---
             String aiScript = null;
             String aiFunction = "decideSkills";
@@ -158,7 +172,8 @@ public class MobManager {
             );
 
             MobType mobType = new MobType(id, entityType, display, faction, health, damage, armor,
-                options, triggerSkills, drops, equipment, timerIntervalTicks, aiScript, aiFunction);
+                options, triggerSkills, drops, equipment, timerIntervalTicks, aiScript, aiFunction,
+                threatTable, level, damageModifiers);
             mobTypes.put(id.toLowerCase(Locale.ROOT), mobType);
         }
 
@@ -222,6 +237,17 @@ public class MobManager {
         if (mobType.getEquipment() != null && living.getEquipment() != null) {
             mobType.getEquipment().applyTo(living.getEquipment());
         }
+
+        // 应用等级（对应 Wiki「等级」：随等级提升血量与近战伤害）
+        if (mobType.getLevel() > 0) {
+            org.gsn.pandora.skills.mechanics.SetLevelMechanic.applyLevel(living, mobType.getLevel());
+        }
+
+        // 触发生成事件（供其他插件监听）
+        try {
+            new org.gsn.pandora.api.PandoraMobSpawnEvent(living, mobType)
+                .callEvent();
+        } catch (Throwable ignored) {}
 
         return living;
     }

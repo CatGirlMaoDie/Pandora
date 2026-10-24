@@ -33,6 +33,12 @@ public class MobType {
     private final String aiScript;
     /** AI 脚本函数名 */
     private final String aiFunction;
+    /** 是否启用威胁表（锁定累计伤害最高的玩家为目标） */
+    private final boolean threatTable;
+    /** 实体等级（0 = 无等级） */
+    private final int level;
+    /** 伤害调整：伤害原因名(大写) -> 倍率（对应 Wiki「伤害调整」） */
+    private final Map<String, Double> damageModifiers;
 
     public MobType(String id,
                    EntityType entityType,
@@ -47,7 +53,10 @@ public class MobType {
                    MobEquipment equipment,
                    long timerIntervalTicks,
                    String aiScript,
-                   String aiFunction) {
+                   String aiFunction,
+                   boolean threatTable,
+                   int level,
+                   Map<String, Double> damageModifiers) {
         this.id = id;
         this.entityType = entityType;
         this.displayName = displayName;
@@ -62,6 +71,9 @@ public class MobType {
         this.timerIntervalTicks = timerIntervalTicks;
         this.aiScript = aiScript;
         this.aiFunction = aiFunction;
+        this.threatTable = threatTable;
+        this.level = level;
+        this.damageModifiers = damageModifiers == null ? Collections.emptyMap() : damageModifiers;
     }
 
     public String getId() {
@@ -129,6 +141,23 @@ public class MobType {
 
     public boolean hasAiScript() {
         return aiScript != null && !aiScript.isEmpty();
+    }
+
+    public boolean hasThreatTable() {
+        return threatTable;
+    }
+
+    public int getLevel() {
+        return level;
+    }
+
+    /**
+     * 获取指定伤害原因的倍率，未配置返回 1.0（不调整）。
+     */
+    public double getDamageModifier(String damageCauseName) {
+        if (damageCauseName == null || damageModifiers.isEmpty()) return 1.0;
+        Double mult = damageModifiers.get(damageCauseName.toUpperCase(java.util.Locale.ROOT));
+        return mult == null ? 1.0 : mult;
     }
 
     /**

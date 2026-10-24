@@ -1,0 +1,43 @@
+# Pandora 随机生成示例（对应 MythicMobs 的随机生成机制）
+# 插件会自动加载 random-spawners/ 目录下所有 .yml 文件。
+#
+# 配置说明：
+# Mob: 要刷新的实体 ID（在 mobs/ 目录中定义）
+# Worlds: 允许生成的世界列表（留空 = 所有世界）
+# Biomes: 允许生成的群系关键字列表（如 DESERT, JUNGLE; 留空 = 所有群系）
+# MinChunkDistance: 距玩家最小区块距离（默认 4）
+# MaxChunkDistance: 距玩家最大区块距离（默认 10）
+# MaxMobsPerWorld: 每世界此类实体最大同时存在数
+# Chance: 每次尝试生成的概率 0-1
+# MinLevel / MaxLevel: 生成的实体等级范围（0 = 不使用等级）
+# Despawn: 消失策略 CHUNK(区块卸载消失)/DESPAWN(远离消失)/NEVER(永不消失)
+# Enabled: 是否启用
+
+DesertBandit:
+  Mob: FireZombie
+  Worlds:
+    - world
+  Biomes:
+    - DESERT
+  MinChunkDistance: 4
+  MaxChunkDistance: 10
+  MaxMobsPerWorld: 10
+  Chance: 0.3
+  MinLevel: 1
+  MaxLevel: 5
+  Despawn: DESPAWN
+  Enabled: true
+
+NightStalker:
+  Mob: SkeletonArcher
+  Worlds:
+    - world
+  Biomes: []
+  MinChunkDistance: 6
+  MaxChunkDistance: 12
+  MaxMobsPerWorld: 5
+  Chance: 0.1
+  MinLevel: 0
+  MaxLevel: 0
+  Despawn: CHUNK
+  Enabled: false

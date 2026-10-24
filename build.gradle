@@ -4,7 +4,7 @@ plugins {
 }
 
 group = 'org.gsn'
-version = '1.2.0'
+version = '1.2.1'
 
 repositories {
     mavenCentral()
@@ -44,6 +44,64 @@ tasks.withType(JavaCompile).configureEach {
         options.release.set(targetJavaVersion)
     }
 }
+
+// 针对 26.1 / 26.2 API 的额外编译校验任务（不影响主产物）
+configurations { compat261; compat262 }
+dependencies {
+    compat261('io.papermc.paper:paper-api:26.1.2.build.74-stable')
+    compat262('io.papermc.paper:paper-api:26.2.build.134-stable')
+}
+repositories {
+    mavenCentral()
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+}
+
+tasks.register('verifyCompat26') {
+    group = 'verification'
+    description = '用 Paper 26.1 / 26.2 API 额外编译校验主源集，确保插件可在这两个版本服务端上运行'
+    doLast {
+        // 26.x API 为 Java 25 class 文件，需 JDK 25+ 才能编译校验
+        def javacExe = null
+        def candidates = [
+            'E:/jdk25/bin/javac.exe',
+            'C:/Program Files/Java/jdk-25/bin/javac.exe'
+        ]
+        def jdk25Home = System.getenv('JDK25_HOME')
+        if (jdk25Home != null) candidates.add(0, jdk25Home + '/bin/javac.exe')
+        for (c in candidates) {
+            if (new File(c).exists()) { javacExe = c; break }
+        }
+        if (javacExe == null) {
+            logger.warn('未找到 JDK 25+（可通过 JDK25_HOME 环境变量指定），跳过 26.x 兼容性校验')
+            return
+        }
+        def buildDir = layout.buildDirectory.dir('compat26').get().asFile
+        buildDir.mkdirs()
+        def sourceFiles = []
+        sourceSets.main.allJava.each { sourceFiles.add(it.absolutePath.replace(File.separatorChar, '/' as char)) }
+        [['26.1', configurations.compat261], ['26.2', configurations.compat262]].each { entry ->
+            def ver = entry[0]
+            def cfg = entry[1]
+            def cp = cfg.resolve().collect { it.absolutePath.replace(File.separatorChar, '/' as char) }.join(';')
+            def outDir = new File(buildDir, 'classes-' + ver)
+            outDir.deleteDir()
+            outDir.mkdirs()
+            def javacArgsFile = new File(buildDir, 'javac-' + ver + '.args')
+            javacArgsFile.text = ([
+                '-encoding', 'UTF-8',
+                '-nowarn',
+                '-classpath', cp,
+                '-d', outDir.absolutePath.replace(File.separatorChar, '/' as char)
+            ] + sourceFiles).join('\n')
+            logger.lifecycle('Compiling against paper-api ' + ver + ' ...')
+            exec {
+                commandLine javacExe, '@' + javacArgsFile.absolutePath
+            }
+            logger.lifecycle('paper-api ' + ver + ' compile OK')
+        }
+    }
+}
+tasks.named('build') { dependsOn 'verifyCompat26' }
 
 processResources {
     def props = [version: version]

@@ -9,6 +9,15 @@ SkeletonKing:
   Damage: 10
   Armor: 5
   Faction: Undead
+  # 等级（对应 MythicMobs 的等级系统，随等级提升血量/近战伤害）
+  Level: 3
+  # 威胁表：开启后锁定累计伤害最高的玩家为目标
+  ThreatTable: true
+  # 伤害调整：对应伤害类型的倍率（1.0 = 不调整）
+  DamageModifiers:
+    PROJECTILE: 1.5     # 额外受到 50% 箭矢伤害
+    DROWNING: 0.0       # 免疫溺水
+    FIRE_TICK: 0.5      # 火焰伤害减半
   # Timer: 每隔多久触发一次 onTimer 技能（支持 10s / 200tick / 5000ms）
   Timer: 10s
   Options:
@@ -33,6 +42,9 @@ SkeletonKing:
       - SummonMinions
     onTimer:
       - FireNova
+    # 信号触发：被其他实体 sendsignal 后执行
+    onSignal:
+      - CallReinforcements
   # Drops: 自定义掉落表（格式：<材质> [数量或范围] [概率0-1]）
   # 设置后会替换原版掉落
   Drops:
@@ -46,6 +58,7 @@ FireZombie:
   Health: 40
   Damage: 5
   Armor: 2
+  Faction: Undead
   Options:
     Despawn: true
   Skills:
